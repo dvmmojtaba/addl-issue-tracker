@@ -2,9 +2,12 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import io
+import pytz
+
 
 import gspread
 from google.oauth2.service_account import Credentials
+LOCAL_TZ = pytz.timezone("America/Indiana/Indianapolis")
 
 # ---------- GOOGLE SHEETS SETUP ----------
 SCOPES = [
@@ -259,9 +262,9 @@ if page == "Add New Issue":
 
                 new_issue = {
                     "Issue ID": new_issue_id,
-                    "Date Reported": datetime.now().strftime(
-                        "%Y-%m-%d %H:%M:%S"
-                    ),
+                    "Date Reported": datetime.now(LOCAL_TZ).strftime(
+    "%Y-%m-%d %H:%M:%S"
+),
                     "Reported By": reported_by,
                     "Category": category,
                     "Subcategory": ", ".join(subcategory)
@@ -401,3 +404,4 @@ elif page == "Analytics Dashboard":
                 st.info("No species data available yet.")
     else:
         st.info("📭 No data yet. Start by adding your first issue!")
+
