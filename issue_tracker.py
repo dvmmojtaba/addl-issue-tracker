@@ -46,47 +46,70 @@ if not os.path.exists(DATA_FILE):
 # Load existing issues
 df = pd.read_excel(DATA_FILE)
 
+# Keep only the columns that match the Add New Issue form
+expected_columns = [
+    "Issue ID", "Date Reported", "Reported By", "Category", "Subcategory",
+    "Lab Section", "Species", "Description", "Action Taken",
+    "Resolution Date", "Notes"
+]
+df = df[expected_columns]
+
 # ---------- PAGE CONFIG ----------
 st.set_page_config(page_title="ADDL Issue Tracker", layout="wide")
 st.title("🐄 ADDL Issue Tracker")
-st.markdown("Log, track, and resolve issues collaboratively with your supervisor.")
+st.markdown("Let's log, track, and resolve issues!")
 
 # ---------- SIDEBAR ----------
 st.sidebar.header("Navigation")
-page = st.sidebar.radio("Go to", ["Add New Issue", "View / Edit Issues", "Analytics Dashboard"])
+page = st.sidebar.radio("Go to", ["Add New Issue", "View Issues", "Analytics Dashboard"])
 
 # ---------- ADD NEW ISSUE ----------
 if page == "Add New Issue":
     st.subheader("📝 Add a New Issue")
 
-    # Category selection OUTSIDE the form so it can trigger dynamic content
-    reported_by = st.text_input("Reported By (Your Name)")
-    category = st.selectbox("Category *", ["— Select —", "Mailing Room", "Client Communication", "Lab Section", "Other"])
+    # Initialize session state for showing success message and form reset
+    if 'show_success' not in st.session_state:
+        st.session_state.show_success = False
+    if 'last_issue_id' not in st.session_state:
+        st.session_state.last_issue_id = None
+    if 'form_key' not in st.session_state:
+        st.session_state.form_key = 0
+    
+    # Show success message if issue was just added
+    if st.session_state.show_success:
+        st.success(f"✅ Issue #{st.session_state.last_issue_id} added successfully!")
+        st.balloons()
+        st.session_state.show_success = False
+        st.session_state.form_key += 1  # Increment to clear all fields
+
+    # Category selection with unique key
+    reported_by = st.text_input("Reported By (Your Name)", key=f"reported_by_{st.session_state.form_key}")
+    category = st.selectbox("Category *", ["— Select —", "Mailing Room", "Client Communication", "Lab Section", "Other"], key=f"category_{st.session_state.form_key}")
 
     # Subcategory pickers appear dynamically based on category selection
     subcategory = []
     if category == "Mailing Room":
-        subcategory = st.multiselect("Mailing Room Issue Type(s) *", mailing_room_issues)
+        subcategory = st.multiselect("Mailing Room Issue Type(s) *", mailing_room_issues, key=f"subcategory_mr_{st.session_state.form_key}")
     elif category == "Client Communication":
-        subcategory = st.multiselect("Client Communication Issue Type(s) *", client_comm_issues)
+        subcategory = st.multiselect("Client Communication Issue Type(s) *", client_comm_issues, key=f"subcategory_cc_{st.session_state.form_key}")
     elif category == "Lab Section":
         st.info("💡 For Lab Section issues, please select the relevant lab section(s) below and describe the issue.")
     elif category == "Other":
         st.info("💡 Please provide details in the Description field below.")
 
-    # Rest of the form
+    # Rest of the form with unique keys
     st.markdown("---")
-    lab_section = st.multiselect("Lab Section(s) (Optional)", lab_sections)
-    species = st.multiselect("Species Involved (Optional)", species_list)
+    lab_section = st.multiselect("Lab Section(s) (Optional)", lab_sections, key=f"lab_section_{st.session_state.form_key}")
+    species = st.multiselect("Species Involved (Optional)", species_list, key=f"species_{st.session_state.form_key}")
 
     st.markdown("---")
-    description = st.text_area("Issue Description *", help="Required: Describe the issue in detail")
-    action_taken = st.text_area("Action Taken (if any)")
-    resolution_date = st.date_input("Resolution Date (if resolved)", value=None)
-    notes = st.text_area("Notes or Comments")
+    description = st.text_area("Issue Description *", help="Required: Describe the issue in detail", key=f"description_{st.session_state.form_key}")
+    action_taken = st.text_area("Action Taken (if any)", key=f"action_taken_{st.session_state.form_key}")
+    resolution_date = st.date_input("Resolution Date (if resolved)", value=None, key=f"resolution_date_{st.session_state.form_key}")
+    notes = st.text_area("Notes or Comments", key=f"notes_{st.session_state.form_key}")
 
-    # Submit button (not in a form anymore)
-    if st.button("Add Issue", type="primary"):
+    # Submit button
+    if st.button("Add Issue", type="primary", use_container_width=True):
         if category == "— Select —":
             st.error("⚠️ Please select a Category before adding the issue.")
         elif not description.strip():
@@ -94,40 +117,59 @@ if page == "Add New Issue":
         elif category in ["Mailing Room", "Client Communication"] and not subcategory:
             st.error(f"⚠️ Please select at least one subcategory for {category}.")
         else:
-            new_issue = {
-                "Issue ID": len(df) + 1,
-                "Date Reported": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "Reported By": reported_by,
-                "Category": category,
-                "Subcategory": ", ".join(subcategory) if subcategory else "",
-                "Lab Section": ", ".join(lab_section) if lab_section else "",
-                "Species": ", ".join(species) if species else "",
-                "Description": description,
-                "Action Taken": action_taken,
-                "Resolution Date": resolution_date.strftime("%Y-%m-%d") if resolution_date else "",
-                "Notes": notes
-            }
+            # Show processing message
+            with st.spinner("Adding issue..."):
+                new_issue = {
+                    "Issue ID": len(df) + 1,
+                    "Date Reported": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "Reported By": reported_by,
+                    "Category": category,
+                    "Subcategory": ", ".join(subcategory) if subcategory else "",
+                    "Lab Section": ", ".join(lab_section) if lab_section else "",
+                    "Species": ", ".join(species) if species else "",
+                    "Description": description,
+                    "Action Taken": action_taken,
+                    "Resolution Date": resolution_date.strftime("%Y-%m-%d") if resolution_date else "",
+                    "Notes": notes
+                }
 
-            # Append new issue and save
-            df = pd.concat([df, pd.DataFrame([new_issue])], ignore_index=True)
-            df.to_excel(DATA_FILE, index=False)
-            st.success("✅ Issue added successfully!")
-            st.balloons()
+                # Append new issue and save
+                df = pd.concat([df, pd.DataFrame([new_issue])], ignore_index=True)
+                df.to_excel(DATA_FILE, index=False)
+                
+                # Store issue ID for success message
+                st.session_state.last_issue_id = len(df)
+                st.session_state.show_success = True
             
-            # Note: Fields won't auto-clear since we're not using st.form
-            st.info("💡 Tip: Refresh the page to add another issue with cleared fields.")
+            # Rerun to show success and clear form
+            st.rerun()
 
-# ---------- VIEW / EDIT ISSUES ----------
-elif page == "View / Edit Issues":
+# ---------- View Issues ----------
+elif page == "View Issues":
     st.subheader("📋 All Issues")
     
-    col1, col2 = st.columns([3, 1])
+    col1, col2, col3 = st.columns([3, 1, 1])
     with col1:
         search = st.text_input("🔍 Search by keyword:", placeholder="Type to filter issues...")
     with col2:
         if st.button("🔄 Refresh Data"):
             df = pd.read_excel(DATA_FILE)
+            # Keep only expected columns
+            df = df[expected_columns]
             st.success("Data refreshed!")
+    with col3:
+        # Download button
+        from io import BytesIO
+        buffer = BytesIO()
+        df.to_excel(buffer, index=False, engine='openpyxl')
+        buffer.seek(0)
+        
+        st.download_button(
+            label="📥 Download",
+            data=buffer,
+            file_name=f"issues_backup_{datetime.now().strftime('%Y%m%d')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
     
     if search:
         filtered = df[df.apply(lambda row: row.astype(str).str.contains(search, case=False).any(), axis=1)]
@@ -163,15 +205,8 @@ elif page == "Analytics Dashboard":
         st.markdown("---")
         
         # Category breakdown
-        col1, col2 = st.columns(2)
-        with col1:
-            st.subheader("Issues by Category")
-            st.bar_chart(df["Category"].value_counts())
-        
-        with col2:
-            st.subheader("Issues by Reporter")
-            reporter_counts = df["Reported By"].value_counts().head(10)
-            st.bar_chart(reporter_counts)
+        st.subheader("Issues by Category")
+        st.bar_chart(df["Category"].value_counts())
         
         st.markdown("---")
         
