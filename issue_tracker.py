@@ -347,6 +347,7 @@ elif page == "Analytics Dashboard":
     df = load_issues()
 
     if not df.empty:
+        # ---------- Top metrics ----------
         col1, col2, col3, col4 = st.columns(4)
         with col1:
             st.metric("Total Issues", len(df))
@@ -364,11 +365,13 @@ elif page == "Analytics Dashboard":
 
         st.markdown("---")
 
+        # ---------- Category breakdown ----------
         st.subheader("Issues by Category")
         st.bar_chart(df["Category"].value_counts())
 
         st.markdown("---")
 
+        # ---------- Lab Section & Species ----------
         col1, col2 = st.columns(2)
 
         with col1:
@@ -402,6 +405,50 @@ elif page == "Analytics Dashboard":
                 st.bar_chart(species_counts)
             else:
                 st.info("No species data available yet.")
+
+        st.markdown("---")
+
+        # ---------- NEW: Mailing Room & Client Communication charts ----------
+        col1, col2 = st.columns(2)
+
+        # Mailing Room subcategory breakdown
+        with col1:
+            st.subheader("Mailing Room Issue Types")
+            mr_df = df[df["Category"] == "Mailing Room"]
+            if not mr_df.empty and mr_df["Subcategory"].astype(str).str.len().any():
+                mr_counts = (
+                    mr_df["Subcategory"]
+                    .astype(str)
+                    .replace("", pd.NA)
+                    .dropna()
+                    .str.split(", ")
+                    .explode()
+                    .value_counts()
+                )
+                st.bar_chart(mr_counts)
+            else:
+                st.info("No Mailing Room issues logged yet.")
+
+        # Client Communication subcategory breakdown
+        with col2:
+            st.subheader("Client Communication Issue Types")
+            cc_df = df[df["Category"] == "Client Communication"]
+            if not cc_df.empty and cc_df["Subcategory"].astype(str).str.len().any():
+                cc_counts = (
+                    cc_df["Subcategory"]
+                    .astype(str)
+                    .replace("", pd.NA)
+                    .dropna()
+                    .str.split(", ")
+                    .explode()
+                    .value_counts()
+                )
+                st.bar_chart(cc_counts)
+            else:
+                st.info("No Client Communication issues logged yet.")
+
     else:
         st.info("📭 No data yet. Start by adding your first issue!")
+
+
 
